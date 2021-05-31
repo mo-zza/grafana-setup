@@ -1,0 +1,63 @@
+version: "3.7"
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.1.2
+    container_name: node-exporter
+    restart: always
+    ports: 
+      - ${NE_PORT}:9100
+    networks: 
+      - monitoring-network
+  alertmanager:
+    image: prom/alertmanager
+    ports:
+      - 9093:9093
+    volumes:
+      - ./conf/prometheus/alertmanager:/etc/alertmanager/
+    networks:
+      - monitoring-network
+    restart: always
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+  prometheus:
+    image: prom/prometheus
+    container_name: promethues
+    restart: always
+    ports: 
+      - ${PM_PORT}:9099
+    command: 
+      - '--web.listen-address=0.0.0.0:9099'
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./conf/prometheus:/etc/prometheus
+      - ./conf/prometheus/${PM_DATA}:/prometheus
+    networks: 
+      - monitoring-network
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    depends_on:
+      - prometheus
+    restart: always
+    ports:
+      - ${GF_PORT}:3000
+    volumes:
+      - ./conf/grafana/entrypoint.sh:/app/entrypoint.sh
+      - ./conf/grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./conf/grafana/${GF_VOLUME}:/var/lib/grafana
+    environment:
+      # - GF_INSTALL_PLUGINS=http://plugin-domain.com/my-custom-plugin.zip;custom-plugin,grafana-clock-panel
+      - GF_SECURITY_ADMIN_USER=${GF_USER_NAME}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - monitoring-network
+networks: 
+  monitoring-network:
+    driver: bridge
